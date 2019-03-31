@@ -1,6 +1,6 @@
 class LessonsController < ApplicationController
   def index
-    lessons = Lesson.all
+    lessons = Lesson.pluck :name
     render json: lessons
   end
 end
