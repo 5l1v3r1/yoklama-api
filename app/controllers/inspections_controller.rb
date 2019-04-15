@@ -1,3 +1,5 @@
+require "FaceRecognition"
+
 class InspectionsController < ApplicationController
     def create
       lessons = Lesson.pluck :id
@@ -8,9 +10,11 @@ class InspectionsController < ApplicationController
       @inspection.lesson = Lesson.find(lesson_id)
       @inspection.student = Student.first
       if @inspection.save!
-        render json: { message: "Yoklama Başarıyla alındı." }
         active_storage_disk_service = ActiveStorage::Service::DiskService.new(root: Rails.root.to_s + '/storage/')
-        puts active_storage_disk_service.send(:path_for, @inspection.image.blob.key)
+        name = FaceRecognition.identify(active_storage_disk_service.send(:path_for, @inspection.image.blob.key))
+        
+        render json: { message: "Yoklama Başarıyla alındı. #{name}", users: name }
+        
       else
         render json: { message: "Hata Oluştu." }
       end
