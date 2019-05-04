@@ -2,28 +2,48 @@ require "FaceRecognition"
 
 class InspectionsController < ApplicationController
     def create
-      lessons = Lesson.pluck :id
-      lesson_id = lessons[params["lesson_number"].to_i]
-      insp_image = InspectionImage.new()
       
-      insp_image.image.attach(params[:image])
-      if insp_image.save!
-        active_storage_disk_service = ActiveStorage::Service::DiskService.new(root: Rails.root.to_s + '/storage/')
-        student_nos = FaceRecognition.identify(active_storage_disk_service.send(:path_for, insp_image.image.blob.key))
-        student_nos.each do |no|
-          @inspection = Inspection.new
-          @inspection.lesson = Lesson.find(lesson_id)
-          @inspection.student = Student.find_by(number: no.to_i)
+      begin  
+        lessons = Lesson.pluck :id
+        lesson_id = lessons[params["lesson_number"].to_i]
+        insp_image = InspectionImage.new()
+        insp_image.image.attach(params[:image])
+        if insp_image.save!
+          active_storage_disk_service = ActiveStorage::Service::DiskService.new(root: Rails.root.to_s + '/storage/')
+          student_nos = FaceRecognition.identify(active_storage_disk_service.send(:path_for, insp_image.image.blob.key))
+          puts "yüz algılanamadı : " + student_nos.last.to_s
+          render json: { message: (student_nos.last.to_s + " yüz algılanamadı.") } and return unless student_nos.last == 0
+          student_nos = student_nos.first
+          puts "Öğrenci numaraları : " + student_nos.join(", ")
+          student_nos.each do |no|
+            puts no
+            @inspection = Inspection.new
+            @inspection.lesson = Lesson.find(lesson_id)
+            @inspection.student = Student.find_by(number: no.to_i)
+            @inspection.save!
+          end
+            render json: { message: "Yoklama Başarıyla alındı. Öğrenciler: #{student_nos.join(",")}" }
+        else
+          render json: { message: "Hata Oluştu." }
         end
-        if @inspection.save!
-          
-          render json: { message: "Yoklama Başarıyla alındı. Öğrenciler: #{student_nos.join(",")}" }
-        end
-      else
-        render json: { message: "Hata Oluştu." } 
-      end
+      rescue StandardError => msg
+        render json: { message: "Hata Oluştu." }
+      end  
+      
     end
     def show
-        @inspection = Inspection.find(params[:id])
+      @inspection = Inspection.find(params[:id])
+    end
+
+    def list
+      date = Date.new(params["yil"].to_i, params["ay"].to_i, params["gun"].to_i)
+      puts "Vakit "+ date.to_s
+      @inspections = Inspection.where( lesson_id: params["ders_id"].to_i.next, created_at: (date + 1.minute)..(date + 24.hours) )
+      
+      kisiler = []
+      @inspections.each do |inspection|
+        kisiler << inspection.student.number
+      end
+      render json: { message: kisiler.uniq! }
     end
 end
