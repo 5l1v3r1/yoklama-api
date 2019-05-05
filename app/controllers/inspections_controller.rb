@@ -15,14 +15,24 @@ class InspectionsController < ApplicationController
           render json: { message: (student_nos.last.to_s + " yüz algılanamadı.") } and return unless student_nos.last == 0
           student_nos = student_nos.first
           puts "Öğrenci numaraları : " + student_nos.join(", ")
+          silinecekler = []
           student_nos.each do |no|
             puts no
             @inspection = Inspection.new
             @inspection.lesson = Lesson.find(lesson_id)
             @inspection.student = Student.find_by(number: no.to_i)
-            @inspection.save!
+            puts "ekleniyor"
+            
+            if @inspection.lesson.students.include? @inspection.student 
+              puts @inspection.save!
+              puts "eklendi"
+            else
+              puts "eklenemedi"
+              silinecekler << no
+            end
           end
-            render json: { message: "Yoklama Başarıyla alındı. Öğrenciler: #{student_nos.join(",")}" }
+          student_nos -= silinecekler
+          render json: { message: "Yoklama Başarıyla alındı. Öğrenciler: #{student_nos.join(",") unless student_nos.empty?} " + "\n#{silinecekler.count} kişi bu dersi almıyor." }
         else
           render json: { message: "Hata Oluştu." }
         end
@@ -37,13 +47,13 @@ class InspectionsController < ApplicationController
 
     def list
       date = Date.new(params["yil"].to_i, params["ay"].to_i, params["gun"].to_i)
-      puts "Vakit "+ date.to_s
-      @inspections = Inspection.where( lesson_id: params["ders_id"].to_i.next, created_at: (date + 1.minute)..(date + 24.hours) )
+      puts "Vakit " + date.to_s
+      @inspections = Inspection.select(:student_id)
+                               .where( lesson_id: params["ders_id"].to_i + 1, created_at: (date)..(date + 1.day) )
+                               .group(:student_id)
       
-      kisiler = []
-      @inspections.each do |inspection|
-        kisiler << inspection.student.number
-      end
-      render json: { message: kisiler.uniq! }
+      kisiler = @inspections.map { |inspection| inspection.student.number }
+
+      render json: { message: kisiler }
     end
 end

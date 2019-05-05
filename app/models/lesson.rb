@@ -3,5 +3,4 @@ class Lesson < ApplicationRecord
 
   has_many :inspections
   has_many :inspections_students, through: :inspections, source: :student
-
 end
